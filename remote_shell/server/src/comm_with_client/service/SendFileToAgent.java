@@ -1,22 +1,20 @@
 
-/**
- * Tencent is pleased to support the open source community by making MSEC available.
- *
- * Copyright (C) 2016 THL A29 Limited, a Tencent company. All rights reserved.
- *
- * Licensed under the GNU General Public License, Version 2.0 (the "License"); 
- * you may not use this file except in compliance with the License. You may 
- * obtain a copy of the License at
- *
- *     https://opensource.org/licenses/GPL-2.0
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the 
- * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
- * either express or implied. See the License for the specific language governing permissions
- * and limitations under the License.
- */
-
-
+/*
+* Tencent is pleased to support the open source community by making MSEC available.
+*
+* Copyright (C) 2016 THL A29 Limited, a Tencent company. All rights reserved.
+*
+* Licensed under the GNU General Public License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License. You may
+* obtain a copy of the License at
+*
+*     https://opensource.org/licenses/GPL-2.0
+*
+* Unless required by applicable law or agreed to in writing, software distributed under the
+* License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+* either express or implied. See the License for the specific language governing permissions
+* and limitations under the License.
+*/
 package comm_with_client.service;
 
 import comm_with_client.request.SendFileToAgentRequest;
@@ -32,6 +30,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
+import java.nio.charset.Charset;
 import java.security.MessageDigest;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -42,8 +41,6 @@ import java.util.logging.Logger;
 public class SendFileToAgent extends JsonRPCHandler {
 
 
-    //简单签名一下，用私钥对文件内容的摘要加密，没有时间、随机数等因子，可能会被恶意者
-    //重放这个请求，不管了，因为加上签名时间对服务器的时间同步有要求
     private String geneSignature(String filename)
     {
 
@@ -70,8 +67,17 @@ public class SendFileToAgent extends JsonRPCHandler {
 
 
             System.out.println("file sha256:"+Tools.toHexString(result));
-
-            result = Tools.encryptWithPriKey(result, Main.privateKey);
+            //combine file digest and current time together
+            byte[] digestAndTimestamp = new byte[64];
+            for (int i = 0; i < 32; i++) {
+                digestAndTimestamp[i] = result[i];
+            }
+            byte[] currentSec = Tools.currentSeconds().getBytes(Charset.forName("UTF-8"));
+            for (int i = 0; i < 32; i++) {
+                digestAndTimestamp[i+32] = currentSec[i];
+            }
+            //encrypt
+            result = Tools.encryptWithPriKey(digestAndTimestamp, Main.privateKey);
             if (result == null || result.length < 64)
             {
                 return "";
